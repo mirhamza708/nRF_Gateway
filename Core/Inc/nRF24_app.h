@@ -24,8 +24,8 @@ extern uint8_t maxrtCounter;
 
 void APP_SwitchToTx(uint8_t *tx_pipe_addr);
 void APP_SwitchToRx(uint8_t *rx_pipe0_addr, uint8_t *rx_pipe1_addr);
-void nRF24_receive_data(node_info_t *_node);
-void nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node);
+uint8_t nRF24_receive_data(node_info_t *_node);
+uint8_t nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node);
 void nrf24FailureCheckAndResolve(void);
 void printRadioSettings(void);
 void printStatusReg(void);

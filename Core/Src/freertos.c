@@ -197,6 +197,7 @@ void StartTask02(void *argument)
 {
   /* USER CODE BEGIN StartTask02 */
 	/* Infinite loop */
+	uint8_t ret;
 	for (;;)
 	{
 		for (int i = 0; i < gateway.num_nodes; i++)
@@ -213,15 +214,23 @@ void StartTask02(void *argument)
 			while (node[i].tx_packet.txDone != true
 					&& node[i].tx_packet.maxRT != true)
 			{
-				node[i].deadCounter++;
-				nRF24_transmit_data(&node[i].tx_packet, &gateway.node[i]);
+
+				ret = nRF24_transmit_data(&node[i].tx_packet, &gateway.node[i]);
+				if(ret == 2 || ret == 3) {
+					node[i].deadCounter++;
+				}
+				ret = 0;
 			}
 			uint32_t rxStartTime = HAL_GetTick();
 			while ((node[i].tx_packet.txDone == true
 					&& node[i].tx_packet.rxDone != true)
 					&& ((HAL_GetTick() - rxStartTime) < 95))
 			{
-				nRF24_receive_data(&node[i]);
+				ret = nRF24_receive_data(&node[i]);
+				if(ret == 3 || ret == 4) {
+					node[i].deadCounter = 0;
+				}
+				ret = 0;
 			}
 
 //			if (node[i].tx_packet.txDone == true

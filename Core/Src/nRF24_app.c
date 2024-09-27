@@ -232,7 +232,7 @@ uint8_t nRF24_receive_data(node_info_t *_node)
  *  @return       None
  *  @note
  */
-void nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node)
+uint8_t nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node)
 {
 	INT8U tx_buffer[32] =
 	{ 0 };
@@ -260,6 +260,12 @@ void nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node)
 					uint8_t lenth = sprintf(tx_buff, "Interrupt not firing\r\n");
 					HAL_UART_Transmit(&huart2, (uint8_t*) tx_buff, lenth, 100);
 	#endif
+		L01_FlushTX();
+		L01_FlushRX();
+		L01_ClearIRQ(IRQ_ALL);
+		APP_SwitchToRx(gateway.nrf24_config.rx_pipe0_addr,
+				gateway.nrf24_config.rx_pipe1_addr);
+		return 0;
 	}
 	INT8U irqSrc = L01_ReadIRQSource();
 	if (irqSrc & (1 << TX_DS))
@@ -278,6 +284,12 @@ void nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node)
 				_node->rx_pipe_address[4]);
 		HAL_UART_Transmit(&huart2, (uint8_t*) tx_buff, lenth, 100);
 #endif
+		L01_FlushTX();
+		L01_FlushRX();
+		L01_ClearIRQ(IRQ_ALL);
+		APP_SwitchToRx(gateway.nrf24_config.rx_pipe0_addr,
+				gateway.nrf24_config.rx_pipe1_addr);
+		return 3;
 	}
 	else if (irqSrc & (1 << MAX_RT))
 	{
@@ -293,12 +305,19 @@ void nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node)
 #endif
 //		HAL_Delay(5);
 		maxrtCounter++;
+		L01_FlushTX();
+		L01_FlushRX();
+		L01_ClearIRQ(IRQ_ALL);
+		APP_SwitchToRx(gateway.nrf24_config.rx_pipe0_addr,
+				gateway.nrf24_config.rx_pipe1_addr);
+		return 2;
 	}
 	L01_FlushTX();
 	L01_FlushRX();
 	L01_ClearIRQ(IRQ_ALL);
 	APP_SwitchToRx(gateway.nrf24_config.rx_pipe0_addr,
 			gateway.nrf24_config.rx_pipe1_addr);
+	return 1;
 }
 
 void nrf24FailureCheckAndResolve(void)

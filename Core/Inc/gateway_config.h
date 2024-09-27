@@ -76,6 +76,7 @@ typedef struct
 	dpSensor_attr_t dpSensorAttr;
 	bool ConfigReady;
 	uint8_t getConfigCounter;
+	uint8_t deadCounter;
 }node_info_t;
 
 //structures to hold data of the gateway device right now only pipe address is given the
