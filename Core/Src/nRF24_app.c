@@ -66,7 +66,7 @@ void APP_SwitchToTx(uint8_t *tx_pipe_addr)
  *  @return       None
  *  @note
  */
-void nRF24_receive_data(node_info_t *_node)
+uint8_t nRF24_receive_data(node_info_t *_node)
 {
 	INT8U len, rcv_buffer[32] =
 	{ 0 };
@@ -74,17 +74,19 @@ void nRF24_receive_data(node_info_t *_node)
 	//check interrupt
 	if (GET_L01_IRQ() == 1)
 	{
-		return;
+		return 0; // nothing received
 	}
 	//detect RF module receive interrupt
 	if (!(L01_ReadIRQSource() & (1 << RX_DR)))
 	{
-		return;
+		return 0; // nothing received
 	}
+
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
-	if ((len = L01_ReadRXPayload(rcv_buffer)) != 0)
+	len = L01_ReadRXPayload(rcv_buffer);
+	if (len != 0)
 	{
-		if (len == 7)
+		if (len == 7) //means data packet
 		{
 			_node->device_type = rcv_buffer[0];
 			switch (_node->device_type)
@@ -121,8 +123,12 @@ void nRF24_receive_data(node_info_t *_node)
 					rcv_buffer[5]);
 			HAL_UART_Transmit(&huart2, (uint8_t*) tx_buff, lenth, 100);
 #endif
+			_node->tx_packet.rxDone = true;
+			L01_FlushRX();
+			L01_ClearIRQ(IRQ_ALL);
+			return 3; // data length 7
 		}
-		else if (len == 23)
+		else if (len == 23) //means configuration packet
 		{
 			// Copy name
 			memcpy(_node->name, rcv_buffer, 6);
@@ -159,11 +165,20 @@ void nRF24_receive_data(node_info_t *_node)
 			HAL_UART_Transmit(&huart2, (uint8_t*) tx_buff, lenth, 1000);
 #endif
 			_node->ConfigReady = true;
+			_node->tx_packet.rxDone = true;
+			L01_FlushRX();
+			L01_ClearIRQ(IRQ_ALL);
+			return 4; // data length 23
 		}
-		_node->tx_packet.rxDone = true;
+
+		L01_FlushRX();
+		L01_ClearIRQ(IRQ_ALL);
+		return 2; // data length neither 7 nor 23
 	}
+
 	L01_FlushRX();
 	L01_ClearIRQ(IRQ_ALL);
+	return 1; // data length 0
 }
 
 /*!

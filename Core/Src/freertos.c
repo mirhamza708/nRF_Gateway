@@ -213,6 +213,7 @@ void StartTask02(void *argument)
 			while (node[i].tx_packet.txDone != true
 					&& node[i].tx_packet.maxRT != true)
 			{
+				node[i].deadCounter++;
 				nRF24_transmit_data(&node[i].tx_packet, &gateway.node[i]);
 			}
 			uint32_t rxStartTime = HAL_GetTick();
