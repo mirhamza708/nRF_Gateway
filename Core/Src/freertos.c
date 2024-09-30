@@ -197,7 +197,7 @@ void StartTask02(void *argument)
 {
   /* USER CODE BEGIN StartTask02 */
 	/* Infinite loop */
-	uint8_t ret;
+	uint8_t ret = 0;
 	for (;;)
 	{
 		for (int i = 0; i < gateway.num_nodes; i++)
@@ -217,7 +217,11 @@ void StartTask02(void *argument)
 
 				ret = nRF24_transmit_data(&node[i].tx_packet, &gateway.node[i]);
 				if(ret == 2 || ret == 3) {
-					node[i].deadCounter++;
+					if(node[i].deadCounter < 250) {
+						node[i].deadCounter++;
+					} else if (node[i].deadCounter >= 250) {
+						node[i].deadCounter = 10; //if the counter rolls back, then we dont want to seee the device alive when its actually not.
+					}
 				}
 				ret = 0;
 			}
@@ -228,7 +232,7 @@ void StartTask02(void *argument)
 			{
 				ret = nRF24_receive_data(&node[i]);
 				if(ret == 3 || ret == 4) {
-					node[i].deadCounter = 0;
+					node[i].deadCounter = 0; //make it zero to inform that the node is alive
 				}
 				ret = 0;
 			}
@@ -238,6 +242,13 @@ void StartTask02(void *argument)
 //			{
 //				sendToESP32(&node[i], i + 1);
 //			}
+
+			if (node[i].deadCounter <= 10) {
+				node[i].alive = true;
+			} else {
+				node[i].alive = false;
+			}
+
 			node[i].tx_packet.txDone = false;
 			node[i].tx_packet.rxDone = false;
 			node[i].tx_packet.maxRT = false;
