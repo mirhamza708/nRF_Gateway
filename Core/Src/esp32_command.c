@@ -41,7 +41,7 @@ void sendToESP32(node_info_t *_node, uint8_t nodeNumber)
 
             // Start with nodeNumber
             reply[offset++] = nodeNumber;
-
+            reply[offset++] = _node->alive;
             // Copy device name
             memcpy(&reply[offset], _node->name, sizeof(_node->name));
             offset += sizeof(_node->name);
@@ -66,7 +66,6 @@ void sendToESP32(node_info_t *_node, uint8_t nodeNumber)
             // Copy pwr
             reply[offset++] = _node->nrf24_config.pwr;
 
-            reply[offset++] = _node->alive;
             // Copy thermostat attributes
             switch (_node->device_type) {
             	case 1:
