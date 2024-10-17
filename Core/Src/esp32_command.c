@@ -93,6 +93,14 @@ void sendToESP32(node_info_t *_node, uint8_t nodeNumber)
 					reply[offset++] = 0;
 					reply[offset++] = 22;
 					break;
+            	case 5:
+            		reply[offset++] = 0;
+					reply[offset++] = 0;
+					reply[offset++] = 0;
+					reply[offset++] = 0;
+					reply[offset++] = 0;
+					reply[offset++] = _node->fireAlarmAttr.alarm;
+					break;
             	default:
             		//all data zero
             		reply[offset++] = 0;

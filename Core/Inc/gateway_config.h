@@ -47,6 +47,11 @@ typedef struct
 
 typedef struct
 {
+    uint8_t alarm;
+}fireAlarm_attr_t;
+
+typedef struct
+{
 	uint8_t pressure;
 }dpSensor_attr_t;
 
@@ -74,6 +79,7 @@ typedef struct
 	thermostat_attr_t thermostatAttr;
 	ductSensor_attr_t ductSensorAttr;
 	dpSensor_attr_t dpSensorAttr;
+	fireAlarm_attr_t fireAlarmAttr;
 	bool ConfigReady;
 	uint8_t getConfigCounter;
 	uint8_t deadCounter;

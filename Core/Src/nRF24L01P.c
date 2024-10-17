@@ -396,6 +396,30 @@ void L01_SetPower(L01_PWR power)
     }
     L01_WriteSingleReg(L01REG_RF_SETUP,mask);
 }
+
+/*!
+ *  @brief      Set the LNA (Low Noise Amplifier) state in the nRF24L01+ RF setup register.
+ *  @param      state: LNA_ENABLE to enable LNA, LNA_DISABLE to disable LNA.
+ *  @return     None
+ *  @note       This function modifies only the LSB (bit 0) of the RF setup register,
+ *              leaving other bits unchanged. The LNA helps improve the receiver's sensitivity.
+ */
+void L01_SetLNAState(L01_LNAState state)
+{
+    INT8U mask = L01_ReadSingleReg(L01REG_RF_SETUP);  // Read the current value of the register
+
+    if (state == LNA_ENABLE)
+    {
+        mask |= 0x01;  // Set the LSB to enable LNA
+    }
+    else
+    {
+        mask &= ~0x01;  // Clear the LSB to disable LNA
+    }
+
+    L01_WriteSingleReg(L01REG_RF_SETUP, mask);  // Write the updated value back to the register
+}
+
 /*!
  *  @brief        Set the frequency of the nRF24L01+          
  *  @param        freq:the hopping frequency point,range:0-125,2400Mhz-2525Mhz
@@ -494,6 +518,7 @@ uint8_t L01_Init(L01_config_t L01)
     L01_SetDataRate(L01.drate);
     L01_WriteHoppingPoint(L01.channel);
     L01_SetPower(L01.pwr);
+    L01_SetLNAState(LNA_ENABLE);
     L01_SetTXAddr(L01.tx_pipe_addr,5);//Set TX address
     L01_SetRXAddr(0,L01.rx_pipe0_addr,5);//Set RX pipe 0 address
 //    L01_SetRXAddr(1,L01.rx_pipe1_addr,5);//Set RX pipe 1 address

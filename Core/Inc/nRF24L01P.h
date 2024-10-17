@@ -22,7 +22,13 @@ typedef enum {POWER_N_0,POWER_N_6,POWER_N_12,POWER_N_18}L01_PWR;
 typedef enum {TX_MODE,RX_MODE}L01_MODE;
 /*CE pin level selection*/
 typedef enum {CE_LOW,CE_HIGH}CE_STATUS;
-
+/*!
+ *  @brief      Enum to represent LNA enable/disable states.
+ */
+typedef enum {
+    LNA_DISABLE = 0,  /*!< Disable Low Noise Amplifier (LNA) */
+    LNA_ENABLE  = 1   /*!< Enable Low Noise Amplifier (LNA) */
+} L01_LNAState;
 typedef struct
 {
 	uint8_t rx_pipe0_addr[5];
@@ -102,6 +108,8 @@ void L01_SetRXAddr(INT8U pipeNum,INT8U *addrBuffer,INT8U addr_size);
 void L01_SetDataRate(L01_DRATE drate);
 /*Set the power of the nRF24L01+ */
 void L01_SetPower(L01_PWR power);
+/*Set the lnastate of the nRF24L01+ */
+void L01_SetLNAState(L01_LNAState state);
 /*Set the frequency of the nRF24L01+*/
 void L01_WriteHoppingPoint(INT8U freq);
 /*Set the nRF24L01+ as TX/RX mode*/

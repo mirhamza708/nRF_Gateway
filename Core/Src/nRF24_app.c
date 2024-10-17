@@ -84,6 +84,11 @@ uint8_t nRF24_receive_data(node_info_t *_node)
 
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
 	len = L01_ReadRXPayload(rcv_buffer);
+
+	char tx_buff[100];
+	uint8_t lenth = sprintf(tx_buff, "length: %d\r\n", len);
+	HAL_UART_Transmit(&huart2, (uint8_t*) tx_buff, lenth, 100);
+
 	if (len != 0)
 	{
 		if (len == 7) //means data packet
@@ -110,6 +115,8 @@ uint8_t nRF24_receive_data(node_info_t *_node)
 			case 4:
 
 				break;
+			case 5:
+				_node->fireAlarmAttr.alarm = rcv_buffer[6];
 			default:
 				//do nothing.
 				break;
@@ -118,9 +125,9 @@ uint8_t nRF24_receive_data(node_info_t *_node)
 			char tx_buff[100];
 			uint8_t lenth = sprintf(tx_buff, "message received >> ");
 			HAL_UART_Transmit(&huart2, (uint8_t*) tx_buff, lenth, 100);
-			lenth = sprintf(tx_buff, "Params: %X%X%X%X%X%X\r\n", rcv_buffer[0],
+			lenth = sprintf(tx_buff, "Params: 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X\r\n", rcv_buffer[0],
 					rcv_buffer[1], rcv_buffer[2], rcv_buffer[3], rcv_buffer[4],
-					rcv_buffer[5]);
+					rcv_buffer[5], rcv_buffer[6]);
 			HAL_UART_Transmit(&huart2, (uint8_t*) tx_buff, lenth, 100);
 #endif
 			_node->tx_packet.rxDone = true;
@@ -149,20 +156,23 @@ uint8_t nRF24_receive_data(node_info_t *_node)
 			_node->nrf24_config.drate = rcv_buffer[21];
 			_node->nrf24_config.pwr = rcv_buffer[22];
 #if NRF_DEBUG == 1
-			char tx_buff[100];
-			uint8_t lenth =
-					sprintf(tx_buff,
-							"Config: %X%X%X%X%X%X%X%X%X%X%X%X%X%X%X%X%X%X%X%X%X%X%X%X%X%X%X\r\n",
-							rcv_buffer[0], rcv_buffer[1], rcv_buffer[2],
-							rcv_buffer[3], rcv_buffer[4], rcv_buffer[5],
-							rcv_buffer[6], rcv_buffer[7], rcv_buffer[8],
-							rcv_buffer[9], rcv_buffer[10], rcv_buffer[11],
-							rcv_buffer[12], rcv_buffer[13], rcv_buffer[14],
-							rcv_buffer[15], rcv_buffer[16], rcv_buffer[17],
-							rcv_buffer[18], rcv_buffer[19], rcv_buffer[20],
-							rcv_buffer[21], rcv_buffer[22], rcv_buffer[23],
-							rcv_buffer[24], rcv_buffer[25], rcv_buffer[26]);
-			HAL_UART_Transmit(&huart2, (uint8_t*) tx_buff, lenth, 1000);
+			char tx_buff[200];  // Increased buffer size to hold the entire formatted string
+			uint8_t length =
+			    snprintf(tx_buff, sizeof(tx_buff),
+			             "Config: 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X,"
+			             " 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X,"
+			             " 0x%02X, 0x%02X,\r\n",
+			             rcv_buffer[0], rcv_buffer[1], rcv_buffer[2],
+			             rcv_buffer[3], rcv_buffer[4], rcv_buffer[5],
+			             rcv_buffer[6], rcv_buffer[7], rcv_buffer[8],
+			             rcv_buffer[9], rcv_buffer[10], rcv_buffer[11],
+			             rcv_buffer[12], rcv_buffer[13], rcv_buffer[14],
+			             rcv_buffer[15], rcv_buffer[16], rcv_buffer[17],
+			             rcv_buffer[18], rcv_buffer[19], rcv_buffer[20],
+			             rcv_buffer[21], rcv_buffer[22]);
+
+			// Transmit the message over UART
+			HAL_UART_Transmit(&huart2, (uint8_t*)tx_buff, length, 1000);
 #endif
 			_node->ConfigReady = true;
 			_node->tx_packet.rxDone = true;
