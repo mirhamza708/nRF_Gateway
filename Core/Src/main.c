@@ -105,6 +105,10 @@ int main(void)
 	EE_Read();
 	print_config();
 	//initialize the nrf24 in receive mode
+	while(HAL_GPIO_ReadPin(STM_EN_PIN_GPIO_Port, STM_EN_PIN_Pin) == 0)
+	{
+		HAL_Delay(100);
+	}
 	HAL_Delay(1000);
 	uint8_t ret_code = L01_Init(gateway.nrf24_config);
 	if (ret_code != 0)
@@ -144,9 +148,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  /* USER CODE END 3 */
 	}
+  /* USER CODE END 3 */
 }
+
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -200,13 +205,13 @@ void SystemClock_Config(void)
 //void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 //{
 //  /* USER CODE BEGIN Callback 0 */
-////
+////////////////
 //  /* USER CODE END Callback 0 */
 //  if (htim->Instance == TIM1) {
 //    HAL_IncTick();
 //  }
 //  /* USER CODE BEGIN Callback 1 */
-////
+////////////////
 //  /* USER CODE END Callback 1 */
 //}
 
@@ -220,10 +225,11 @@ void Error_Handler(void)
 	/* User can add his own implementation to report the HAL error return state */
 	char tx_buff[50];
 	uint16_t length = sprintf(tx_buff,
-			"NRF24 not initialized, Reseting in 1 sec");
+			"Unexpected event resetting..");
 	HAL_UART_Transmit(&huart2, (uint8_t*) tx_buff, length, 100);
 	HAL_Delay(1000);
 	__disable_irq();
+	HAL_NVIC_SystemReset();
 	while (1)
 	{
 	}

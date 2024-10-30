@@ -60,6 +60,10 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define STATUS_LED_Pin GPIO_PIN_13
 #define STATUS_LED_GPIO_Port GPIOC
+#define STM_UART_RST_PIN_Pin GPIO_PIN_0
+#define STM_UART_RST_PIN_GPIO_Port GPIOA
+#define STM_EN_PIN_Pin GPIO_PIN_1
+#define STM_EN_PIN_GPIO_Port GPIOA
 #define NRF_IRQ_Pin GPIO_PIN_4
 #define NRF_IRQ_GPIO_Port GPIOA
 #define NRF_CE_Pin GPIO_PIN_0

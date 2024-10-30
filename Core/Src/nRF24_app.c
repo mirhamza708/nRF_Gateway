@@ -46,6 +46,10 @@ void APP_SwitchToRx(uint8_t *rx_pipe0_addr, uint8_t *rx_pipe1_addr)
  */
 void APP_SwitchToTx(uint8_t *tx_pipe_addr)
 {
+	L01_FlushTX();
+	L01_FlushRX();
+	L01_ClearIRQ(IRQ_ALL);
+
 	L01_SetCE(CE_LOW);
 	L01_SetPowerUp();
 	HAL_Delay(3);
@@ -85,9 +89,9 @@ uint8_t nRF24_receive_data(node_info_t *_node)
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
 	len = L01_ReadRXPayload(rcv_buffer);
 
-	char tx_buff[100];
-	uint8_t lenth = sprintf(tx_buff, "length: %d\r\n", len);
-	HAL_UART_Transmit(&huart2, (uint8_t*) tx_buff, lenth, 100);
+//	char tx_buff[100];
+//	uint8_t lenth = sprintf(tx_buff, "length: %d\r\n", len);
+//	HAL_UART_Transmit(&huart2, (uint8_t*) tx_buff, lenth, 100);
 
 	if (len != 0)
 	{
@@ -255,6 +259,8 @@ uint8_t nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node)
 	tx_buffer[4] = tx_data->set_temperature;
 	tx_buffer[5] = tx_data->read;
 
+
+
 	HAL_GPIO_WritePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin, 0); //turn on LED and keep on until message sent
 	APP_SwitchToTx(_node->rx_pipe_address);
 	L01_WriteTXPayload_Ack(tx_buffer, 6);
@@ -333,10 +339,7 @@ uint8_t nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node)
 void nrf24FailureCheckAndResolve(void)
 {
 	//check to find if radio hardware failed. if yes then do a reset.
-	printRadioSettings();
-	printConfigReg();
-	printFIFOstatus();
-	printStatusReg();
+
 	//if the address returns correct we can atleast say that the SPI communication with the nrf24 is working
 	uint8_t pipeAddrs[5];
 	L01_ReadMultiReg(L01REG_RX_ADDR_P0, pipeAddrs, 5);

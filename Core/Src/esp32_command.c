@@ -134,15 +134,100 @@ void process_command(void)
 		return;
 	}
 
-	gateway.node_num = esp32_command_data[0]; //remove from struct and create local var if appropriate
-	node[gateway.node_num].tx_packet.write = esp32_command_data[1];
-	node[gateway.node_num].tx_packet.thermostat_state = esp32_command_data[2];
-	node[gateway.node_num].tx_packet.thermostat_mode = esp32_command_data[3];
-	node[gateway.node_num].tx_packet.fan_speed = esp32_command_data[4];
-	node[gateway.node_num].tx_packet.set_temperature = esp32_command_data[5];
-	node[gateway.node_num].tx_packet.read = esp32_command_data[6];
+	// Extract the received CRC from esp32_command_data[7] and esp32_command_data[8]
+	uint16_t received_crc = (esp32_command_data[7] << 8) | esp32_command_data[8];
+
+	// Calculate CRC of the first 7 bytes of esp32_command_data
+	uint16_t calculated_crc = crc16(esp32_command_data, 7);
+
+	if (calculated_crc == received_crc) {
+	    // CRC is valid; proceed with processing data
+	    gateway.node_num = esp32_command_data[0];
+	    node[gateway.node_num].tx_packet.write = esp32_command_data[1];
+	    node[gateway.node_num].tx_packet.thermostat_state = esp32_command_data[2];
+	    node[gateway.node_num].tx_packet.thermostat_mode = esp32_command_data[3];
+	    node[gateway.node_num].tx_packet.fan_speed = esp32_command_data[4];
+	    node[gateway.node_num].tx_packet.set_temperature = esp32_command_data[5];
+	    node[gateway.node_num].tx_packet.read = esp32_command_data[6];
+
+	    char tx_buff[150];
+		uint8_t length = sprintf(tx_buff,
+		    "MQTT Command:\nNode: %d\nWrite: %d\nThermostat State: %d\nThermostat Mode: %d\nFan Speed: %d\nSet Temp: %d\nRead: %d\r\n\r\n",
+		    esp32_command_data[0] + 1, esp32_command_data[1], esp32_command_data[2],
+		    esp32_command_data[3], esp32_command_data[4], esp32_command_data[5],
+		    esp32_command_data[6]
+		);
+		HAL_UART_Transmit(&huart2, (uint8_t*)tx_buff, length, 100);
+	}
+
+	char tx_buff[50];
+	sprintf(tx_buff, "done\n");
+	HAL_UART_Transmit(&huart1, (uint8_t*)tx_buff, 5, 100);
 
 	esp32_command_available = false;
+
+	memset(esp32_command_data, 0, sizeof(esp32_command_data));
+	memset(tx_buff, 0, sizeof(tx_buff));
+	// Debug buffer
+
+	if (HAL_UART_Receive_IT(&huart1, esp32_command_data, ESP32_COMMAND_LEN) != HAL_OK) {
+	    // Check and handle specific UART errors
+	    if (huart1.ErrorCode & HAL_UART_ERROR_ORE)  // Overrun error
+	    {
+	        __HAL_UART_CLEAR_OREFLAG(&huart1);  // Clear overrun error flag
+	        // Debug message for overrun error
+#if COMMAND_DEBUG == 1
+	        sprintf(tx_buff, "UART Error: Overrun detected, cleared ORE flag\r\n");
+	        HAL_UART_Transmit(&huart2, (uint8_t*)tx_buff, strlen(tx_buff), 100);
+#endif
+	    }
+	    if (huart1.ErrorCode & HAL_UART_ERROR_FE)  // Framing error
+	    {
+	        __HAL_UART_CLEAR_FEFLAG(&huart1);  // Clear framing error flag
+	        // Debug message for framing error
+#if COMMAND_DEBUG == 1
+	        sprintf(tx_buff, "UART Error: Framing error detected, cleared FE flag\r\n");
+	        HAL_UART_Transmit(&huart2, (uint8_t*)tx_buff, strlen(tx_buff), 100);
+#endif
+	    }
+	    if (huart1.ErrorCode & HAL_UART_ERROR_NE)  // Noise error
+	    {
+	        __HAL_UART_CLEAR_NEFLAG(&huart1);  // Clear noise error flag
+	        // Debug message for noise error
+#if COMMAND_DEBUG == 1
+	        sprintf(tx_buff, "UART Error: Noise error detected, cleared NE flag\r\n");
+	        HAL_UART_Transmit(&huart2, (uint8_t*)tx_buff, strlen(tx_buff), 100);
+#endif
+	    }
+	    if (huart1.ErrorCode & HAL_UART_ERROR_PE)  // Parity error
+	    {
+	        __HAL_UART_CLEAR_PEFLAG(&huart1);  // Clear parity error flag
+	        // Debug message for parity error
+#if COMMAND_DEBUG == 1
+	        sprintf(tx_buff, "UART Error: Parity error detected, cleared PE flag\r\n");
+	        HAL_UART_Transmit(&huart2, (uint8_t*)tx_buff, strlen(tx_buff), 100);
+#endif
+	    }
+
+	    // Attempt to restart UART reception in interrupt mode
+	    if (HAL_UART_Receive_IT(&huart1, esp32_command_data, ESP32_COMMAND_LEN) != HAL_OK) {
+	        // If restart fails, then reinitialize the UART
+	        HAL_UART_DeInit(&huart1);
+	        MX_USART1_UART_Init();
+
+	        // Debug message for reinitialization
+#if COMMAND_DEBUG == 1
+	        sprintf(tx_buff, "UART reinitialization: Reception restart failed, UART reinitialized\r\n");
+	        HAL_UART_Transmit(&huart2, (uint8_t*)tx_buff, strlen(tx_buff), 100);
+#endif
+	    } else {
+	        // Debug message for successful restart
+#if COMMAND_DEBUG == 1
+	    	sprintf(tx_buff, "UART Reception restarted successfully after clearing errors\r\n");
+	        HAL_UART_Transmit(&huart2, (uint8_t*)tx_buff, strlen(tx_buff), 100);
+#endif
+	    }
+	}
 }
 
 

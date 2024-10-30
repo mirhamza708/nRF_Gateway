@@ -9,9 +9,24 @@
   Youtube:    https://www.youtube.com/@nimaltd
   Instagram:  https://instagram.com/github.NimaLTD
 
-  Version:    3.1.0
-
+  Version:    3.2.1
+  
   History:
+              3.2.1
+              - Fixed Selecting BANK for STM32W Series
+
+              3.2.0
+              - Added Manual Configuration
+
+              3.1.3
+              - Fixed L0, L1 configuration
+        
+              3.1.2
+              - Fixed H5 configuration
+
+              3.1.1
+              - Fixed formatting F4
+
               3.1.0
               - Added Verify after Writing
               - Added Checking Pointer in Reading/Writing
@@ -45,6 +60,7 @@ extern "C"
 **************    Public Definitions
 ************************************************************************************************************/
 
+// none
 
 /************************************************************************************************************
 **************    Public struct/enum
@@ -52,8 +68,14 @@ extern "C"
 
 typedef struct
 {
-  uint8_t                *DataPointer;
+  uint8_t                *pData;
   uint32_t               Size;
+  uint32_t               PageSectorSize;
+  uint32_t               Address;
+  uint8_t                PageSectorNumber;
+#if (defined FLASH_BANK_1) || (defined FLASH_BANK_2)
+  uint8_t                BankNumber;
+#endif
 
 } EE_HandleTypeDef;
 
@@ -61,7 +83,7 @@ typedef struct
 **************    Public Functions
 ************************************************************************************************************/
 
-bool      EE_Init(void *StoragePointer, uint32_t Size);
+bool      EE_Init(void *pData, uint32_t Size);
 uint32_t  EE_Capacity(void);
 bool      EE_Format(void);
 void      EE_Read(void);

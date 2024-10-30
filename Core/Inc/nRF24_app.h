@@ -13,7 +13,7 @@
 #include "nRF24L01P.h"
 #include "gateway_config.h"
 
-#define NRF_DEBUG 1
+//#define NRF_DEBUG 1
 
 #define _BOOL(x) (((x)>0) ? 1:0)
 
