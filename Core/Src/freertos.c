@@ -183,58 +183,59 @@ void StartDefaultTask(void *argument) {
 /* USER CODE END Header_StartTask02 */
 void StartTask02(void *argument) {
 	/* USER CODE BEGIN StartTask02 */
-	/* Infinite loop */
-	uint8_t ret = 0;
 	for (;;) {
+		// Loop through all nodes
 		for (int i = 0; i < gateway.num_nodes; i++) {
-			if (node[i].ConfigReady == false) {
-				node[i].tx_packet.read = 0x01;
-			} else {
-				node[i].tx_packet.read = 0x02;
-			}
+			// Set packet read value based on ConfigReady
+			node[i].tx_packet.read = node[i].ConfigReady ? 0x02 : 0x01;
 
-			while (node[i].tx_packet.txDone != true
-					&& node[i].tx_packet.maxRT != true) {
-				ret = nRF24_transmit_data(&node[i].tx_packet, &gateway.node[i]);
-				if (ret == 2 || ret == 3) {
+			// 1. Transmit Data retry 3 times if not successful
+			bool transmissionSuccessful = false;
+			for (int attempt = 0; attempt < 1; attempt++) {
+				nrfTxStatus ret = nRF24_transmit_data(&node[i].tx_packet, &gateway.node[i], i);
+
+				if (ret != NRF_TX_DONE) {
+					// Transmission failed; increase dead counter
 					if (node[i].deadCounter < 250) {
 						node[i].deadCounter++;
-					} else if (node[i].deadCounter >= 250) {
-						node[i].deadCounter = 10; //if the counter rolls back, then we dont want to seee the device alive when its actually not.
+					} else {
+						node[i].deadCounter = 10;  // Roll back to avoid false alive status
+					}
+				}
+
+				if (node[i].tx_packet.txDone) {
+					transmissionSuccessful = true;
+					break;  // Exit loop if transmission succeeded
+				}
+				osDelay(20);  // Backoff delay before retry
+			}
+
+			// 2. Receive Data if Transmission was Successful
+			if (transmissionSuccessful) {
+				uint32_t rxStartTime = HAL_GetTick();
+				while ((HAL_GetTick() - rxStartTime) < 100) {
+					nrfRxStatus ret = nRF24_receive_data(&node[i], i);
+
+					if (ret == NRF_RX_CONFIG || ret == NRF_RX_DATA) {
+						// Reset dead counter if response received
+						node[i].deadCounter = 0;
+						node[i].tx_packet.rxDone = true;
+						break;
 					}
 				}
 			}
-			uint32_t rxStartTime = HAL_GetTick();
-			if (ret == 3) {
-				while ((node[i].tx_packet.txDone == true
-						&& node[i].tx_packet.rxDone != true)
-						&& ((HAL_GetTick() - rxStartTime) < 100)) {
-					ret = nRF24_receive_data(&node[i]);
-					if (ret == 3 || ret == 4) {
-						node[i].deadCounter = 0; //make it zero to inform that the node is alive
-					}
-					ret = 0;
-				}
-			}
 
-//			if (node[i].tx_packet.txDone == true
-//					&& node[i].tx_packet.rxDone == true)
-//			{
-//				sendToESP32(&node[i], i + 1);
-//			}
+			// Update node's alive status based on deadCounter
+			node[i].alive = (node[i].deadCounter <= 10);
 
-			if (node[i].deadCounter <= 10) {
-				node[i].alive = true;
-			} else {
-				node[i].alive = false;
-			}
-
+			// Reset packet flags for next iteration
 			node[i].tx_packet.txDone = false;
 			node[i].tx_packet.rxDone = false;
 			node[i].tx_packet.maxRT = false;
-			osDelay(20);
+			osDelay(20);  // Delay to prevent node contention
 		}
 
+		// 3. Periodic Configuration Check if _timerTimeout is true
 		if (_timerTimeout) {
 			for (int i = 0; i < gateway.num_nodes; i++) {
 				node[i].getConfigCounter++;
@@ -247,14 +248,18 @@ void StartTask02(void *argument) {
 //			printConfigReg();
 //			printFIFOstatus();
 //			printStatusReg();
-
 			_timerTimeout = false;
 		}
-		if (HAL_GPIO_ReadPin(STM_EN_PIN_GPIO_Port, STM_EN_PIN_Pin) == 0) //Perform this if STM_EN is LOW
-				{
+
+		// 4. Check for Reset Condition
+		if (HAL_GPIO_ReadPin(STM_EN_PIN_GPIO_Port, STM_EN_PIN_Pin) == 0) {
 			HAL_NVIC_SystemReset();
 		}
+
+		// 5. Perform Failure Check and Resolution for nRF24 Module
 		nrf24FailureCheckAndResolve();
+
+		// Main loop delay to allow system tasks to run
 		osDelay(1000);
 	}
 	/* USER CODE END StartTask02 */
@@ -307,40 +312,6 @@ void configDataHandler(void *argument) {
 			HAL_UART_DeInit(&huart1);
 			MX_USART1_UART_Init();
 			start_UART_ITs();
-		}
-		//Check for any runtime errors in UART1 and fix TODO check if this really works
-		if (huart1.ErrorCode != HAL_UART_ERROR_NONE) {
-			if (HAL_UART_Receive_IT(&huart1, esp32_command_data,
-					ESP32_COMMAND_LEN) != HAL_OK) {
-				// Check and handle specific UART errors
-				if (huart1.ErrorCode & HAL_UART_ERROR_ORE)  // Overrun error
-				{
-					__HAL_UART_CLEAR_OREFLAG(&huart1); // Clear overrun error flag
-					// Debug message for overrun error
-				}
-				if (huart1.ErrorCode & HAL_UART_ERROR_FE)  // Framing error
-				{
-					__HAL_UART_CLEAR_FEFLAG(&huart1); // Clear framing error flag
-					// Debug message for framing error
-				}
-				if (huart1.ErrorCode & HAL_UART_ERROR_NE)  // Noise error
-				{
-					__HAL_UART_CLEAR_NEFLAG(&huart1);  // Clear noise error flag
-					// Debug message for noise error
-				}
-				if (huart1.ErrorCode & HAL_UART_ERROR_PE)  // Parity error
-				{
-					__HAL_UART_CLEAR_PEFLAG(&huart1); // Clear parity error flag
-					// Debug message for parity error
-				}
-				// Attempt to restart UART reception in interrupt mode
-				if (HAL_UART_Receive_IT(&huart1, esp32_command_data,
-						ESP32_COMMAND_LEN) != HAL_OK) {
-					// If restart fails, then reinitialize the UART
-					HAL_UART_DeInit(&huart1);
-					MX_USART1_UART_Init();
-				}
-			}
 		}
 		osDelay(10);
 	}
