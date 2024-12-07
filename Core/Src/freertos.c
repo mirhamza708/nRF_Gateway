@@ -279,7 +279,7 @@ void StartTask03(void *argument) {
 	for (;;) {
 		if (HAL_GPIO_ReadPin(STM_EN_PIN_GPIO_Port, STM_EN_PIN_Pin)) //perform this if STM_EN is HIGH
 				{
-			osDelay(5000);
+			osDelay(12000);
 			if (i > 9)
 				i = 0;
 			sendToESP32(&node[i], i);

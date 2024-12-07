@@ -183,7 +183,7 @@ nrfRxStatus nRF24_receive_data(node_info_t *_node, uint8_t msgId)//TODO bring th
 			L01_ClearIRQ(IRQ_ALL);
 			return NRF_RX_DATA; // data length 8
 		}
-		else if (len == 24) //means configuration packet
+		else if (len == 25) //means configuration packet
 		{
 			// Copy name
 			memcpy(_node->name, rcv_buffer + 1, 6);
@@ -194,15 +194,16 @@ nrfRxStatus nRF24_receive_data(node_info_t *_node, uint8_t msgId)//TODO bring th
 			// Copy EUI
 			memcpy(_node->EUI, rcv_buffer + 8, 8);
 
+			_node->applicationId = rcv_buffer[16];
 			// Copy channel
-			_node->nrf24_config.channel = rcv_buffer[16];
+			_node->nrf24_config.channel = rcv_buffer[17];
 
 			// Copy rx_pipe1_addr
-			memcpy(_node->nrf24_config.rx_pipe1_addr, rcv_buffer + 17, 5);
+			memcpy(_node->nrf24_config.rx_pipe1_addr, rcv_buffer + 18, 5);
 
 			// Copy drate and pwr
-			_node->nrf24_config.drate = rcv_buffer[22];
-			_node->nrf24_config.pwr = rcv_buffer[23];
+			_node->nrf24_config.drate = rcv_buffer[23];
+			_node->nrf24_config.pwr = rcv_buffer[24];
 #if NRF_DEBUG == 1
 			char tx_buff[200];  // Increased buffer size to hold the entire formatted string
 			uint8_t length =

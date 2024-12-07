@@ -10,7 +10,7 @@
 #include "main.h"
 #include "gateway_config.h"
 
-#define ESP32_COMMAND_LEN 9
+#define ESP32_COMMAND_LEN 17
 
 extern uint8_t esp32_command_data[ESP32_COMMAND_LEN];
 
