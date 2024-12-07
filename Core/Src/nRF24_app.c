@@ -12,10 +12,30 @@
 
 INT8U nRF24_data_recvd = false;
 
+uint8_t nrf24MsgId = 0;
+
 uint8_t nrf24_failure_check_time = false;
 uint8_t nrf24_failure_check_time_counter = 0;
 uint8_t maxrtCounter = 0;
 bool radioFailureDetected = false;
+
+static uint16_t crc16(uint8_t *data, uint16_t length) {
+    uint16_t crc = 0xFFFF;
+
+    for (uint16_t i = 0; i < length; i++) {
+        crc ^= (uint16_t)data[i] << 8;
+
+        for (int j = 0; j < 8; j++) {
+            if (crc & 0x8000) {
+                crc = (crc << 1) ^ 0x8005;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
+}
+
 /*!
  *  @brief        Switch the current RF mode to RX
  *  @param        None
@@ -70,7 +90,7 @@ void APP_SwitchToTx(uint8_t *tx_pipe_addr)
  *  @return       None
  *  @note
  */
-uint8_t nRF24_receive_data(node_info_t *_node)
+nrfRxStatus nRF24_receive_data(node_info_t *_node, uint8_t msgId)//TODO bring the msgId as a local variable to this file only to be used inside here the application doesnot have to worry about msgId
 {
 	INT8U len, rcv_buffer[32] =
 	{ 0 };
@@ -78,12 +98,12 @@ uint8_t nRF24_receive_data(node_info_t *_node)
 	//check interrupt
 	if (GET_L01_IRQ() == 1)
 	{
-		return 0; // nothing received
+		return NRF_RX_WAITING; // nothing received
 	}
 	//detect RF module receive interrupt
 	if (!(L01_ReadIRQSource() & (1 << RX_DR)))
 	{
-		return 0; // nothing received
+		return NRF_RX_WAITING; // nothing received
 	}
 
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
@@ -93,25 +113,48 @@ uint8_t nRF24_receive_data(node_info_t *_node)
 //	uint8_t lenth = sprintf(tx_buff, "length: %d\r\n", len);
 //	HAL_UART_Transmit(&huart2, (uint8_t*) tx_buff, lenth, 100);
 
+    // Verify CRC if the length is at least 2 (to include CRC bytes)
+    if (len >= 2) {
+        // Calculate CRC on received data (excluding the last two bytes)
+        uint16_t calculated_crc = crc16(rcv_buffer, len - 2);
+
+        // Extract received CRC from the last two bytes
+        uint16_t received_crc = (rcv_buffer[len - 2] << 8) | rcv_buffer[len - 1];
+
+        // Check if CRC matches
+        if (calculated_crc != received_crc) {
+            return NRF_RX_CRC_ERROR;  // CRC check failed
+        }
+
+        // Adjust length to exclude the CRC bytes for further processing
+        len -= 2;
+    } else {
+        return NRF_RX_LEN_ERROR; // Insufficient data for CRC check
+    }
+
 	if (len != 0)
 	{
-		if (len == 7) //means data packet
+		if (rcv_buffer[0] != msgId) {
+			return NRF_RX_MID_ERROR;
+		}
+
+		if (len == 8) //means data packet
 		{
-			_node->device_type = rcv_buffer[0];
+			_node->device_type = rcv_buffer[1];
 			switch (_node->device_type)
 			{
 			case 1:
-				_node->thermostatAttr.status = rcv_buffer[1];
-				_node->thermostatAttr.mode = rcv_buffer[2];
-				_node->thermostatAttr.fan_speed = rcv_buffer[3];
-				_node->thermostatAttr.set_temperature = rcv_buffer[4];
-				_node->thermostatAttr.room_humidity = rcv_buffer[5];
-				_node->thermostatAttr.room_temperature = rcv_buffer[6];
+				_node->thermostatAttr.status = rcv_buffer[2];
+				_node->thermostatAttr.mode = rcv_buffer[3];
+				_node->thermostatAttr.fan_speed = rcv_buffer[4];
+				_node->thermostatAttr.set_temperature = rcv_buffer[5];
+				_node->thermostatAttr.room_humidity = rcv_buffer[6];
+				_node->thermostatAttr.room_temperature = rcv_buffer[7];
 				break;
 			case 2:
-				_node->ductSensorAttr.co2 = rcv_buffer[4];
-				_node->ductSensorAttr.humidity = rcv_buffer[5];
-				_node->ductSensorAttr.temperature = rcv_buffer[6];
+				_node->ductSensorAttr.co2 = rcv_buffer[5];
+				_node->ductSensorAttr.humidity = rcv_buffer[6];
+				_node->ductSensorAttr.temperature = rcv_buffer[7];
 				break;
 			case 3:
 
@@ -120,7 +163,8 @@ uint8_t nRF24_receive_data(node_info_t *_node)
 
 				break;
 			case 5:
-				_node->fireAlarmAttr.alarm = rcv_buffer[6];
+				_node->fireAlarmAttr.alarm = rcv_buffer[7];
+				break;
 			default:
 				//do nothing.
 				break;
@@ -137,28 +181,29 @@ uint8_t nRF24_receive_data(node_info_t *_node)
 			_node->tx_packet.rxDone = true;
 			L01_FlushRX();
 			L01_ClearIRQ(IRQ_ALL);
-			return 3; // data length 7
+			return NRF_RX_DATA; // data length 8
 		}
-		else if (len == 23) //means configuration packet
+		else if (len == 25) //means configuration packet
 		{
 			// Copy name
-			memcpy(_node->name, rcv_buffer, 6);
+			memcpy(_node->name, rcv_buffer + 1, 6);
 
 			// Copy device_type
-			_node->device_type = rcv_buffer[6];
+			_node->device_type = rcv_buffer[7];
 
 			// Copy EUI
-			memcpy(_node->EUI, rcv_buffer + 7, 8);
+			memcpy(_node->EUI, rcv_buffer + 8, 8);
 
+			_node->applicationId = rcv_buffer[16];
 			// Copy channel
-			_node->nrf24_config.channel = rcv_buffer[15];
+			_node->nrf24_config.channel = rcv_buffer[17];
 
 			// Copy rx_pipe1_addr
-			memcpy(_node->nrf24_config.rx_pipe1_addr, rcv_buffer + 16, 5);
+			memcpy(_node->nrf24_config.rx_pipe1_addr, rcv_buffer + 18, 5);
 
 			// Copy drate and pwr
-			_node->nrf24_config.drate = rcv_buffer[21];
-			_node->nrf24_config.pwr = rcv_buffer[22];
+			_node->nrf24_config.drate = rcv_buffer[23];
+			_node->nrf24_config.pwr = rcv_buffer[24];
 #if NRF_DEBUG == 1
 			char tx_buff[200];  // Increased buffer size to hold the entire formatted string
 			uint8_t length =
@@ -182,17 +227,17 @@ uint8_t nRF24_receive_data(node_info_t *_node)
 			_node->tx_packet.rxDone = true;
 			L01_FlushRX();
 			L01_ClearIRQ(IRQ_ALL);
-			return 4; // data length 23
+			return NRF_RX_CONFIG; // data length 24
 		}
 
 		L01_FlushRX();
 		L01_ClearIRQ(IRQ_ALL);
-		return 2; // data length neither 7 nor 23
+		return NRF_RX_LEN_ERROR; // data length neither 8 nor 24
 	}
 
 	L01_FlushRX();
 	L01_ClearIRQ(IRQ_ALL);
-	return 1; // data length 0
+	return NRF_RX_EMPTY; // data length 0
 }
 
 /*!
@@ -246,24 +291,24 @@ uint8_t nRF24_receive_data(node_info_t *_node)
  *  @return       None
  *  @note
  */
-uint8_t nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node)
+nrfTxStatus nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node, uint8_t msgId)
 {
 	INT8U tx_buffer[32] =
 	{ 0 };
 	uint32_t txStartTime = 0;
+
 //		INT8U len = fill_rf_tx_buffer(tx_buffer);
-	tx_buffer[0] = tx_data->write;
-	tx_buffer[1] = tx_data->thermostat_state;
-	tx_buffer[2] = tx_data->thermostat_mode;
-	tx_buffer[3] = tx_data->fan_speed;
-	tx_buffer[4] = tx_data->set_temperature;
-	tx_buffer[5] = tx_data->read;
-
-
+	tx_buffer[0] = msgId;
+	tx_buffer[1] = tx_data->write;
+	tx_buffer[2] = tx_data->thermostat_state;
+	tx_buffer[3] = tx_data->thermostat_mode;
+	tx_buffer[4] = tx_data->fan_speed;
+	tx_buffer[5] = tx_data->set_temperature;
+	tx_buffer[6] = tx_data->read;
 
 	HAL_GPIO_WritePin(STATUS_LED_GPIO_Port, STATUS_LED_Pin, 0); //turn on LED and keep on until message sent
 	APP_SwitchToTx(_node->rx_pipe_address);
-	L01_WriteTXPayload_Ack(tx_buffer, 6);
+	L01_WriteTXPayload_Ack(tx_buffer, 7);
 	L01_SetCE(CE_HIGH);
 	txStartTime = HAL_GetTick();
 	while (GET_L01_IRQ() != 0 && (HAL_GetTick() - txStartTime) < 95)
@@ -281,7 +326,7 @@ uint8_t nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node)
 		L01_ClearIRQ(IRQ_ALL);
 		APP_SwitchToRx(gateway.nrf24_config.rx_pipe0_addr,
 				gateway.nrf24_config.rx_pipe1_addr);
-		return 0;
+		return NRF_TX_INT_FAIL;
 	}
 	INT8U irqSrc = L01_ReadIRQSource();
 	if (irqSrc & (1 << TX_DS))
@@ -305,7 +350,7 @@ uint8_t nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node)
 		L01_ClearIRQ(IRQ_ALL);
 		APP_SwitchToRx(gateway.nrf24_config.rx_pipe0_addr,
 				gateway.nrf24_config.rx_pipe1_addr);
-		return 3;
+		return NRF_TX_DONE;
 	}
 	else if (irqSrc & (1 << MAX_RT))
 	{
@@ -326,14 +371,14 @@ uint8_t nRF24_transmit_data(nRF24_transmit_data_t *tx_data, node_t *_node)
 		L01_ClearIRQ(IRQ_ALL);
 		APP_SwitchToRx(gateway.nrf24_config.rx_pipe0_addr,
 				gateway.nrf24_config.rx_pipe1_addr);
-		return 2;
+		return NRF_TX_MAX_RT;
 	}
 	L01_FlushTX();
 	L01_FlushRX();
 	L01_ClearIRQ(IRQ_ALL);
 	APP_SwitchToRx(gateway.nrf24_config.rx_pipe0_addr,
 			gateway.nrf24_config.rx_pipe1_addr);
-	return 1;
+	return NRF_TX_UNKNOWN_ERROR;
 }
 
 void nrf24FailureCheckAndResolve(void)

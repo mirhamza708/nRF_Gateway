@@ -104,6 +104,8 @@ int main(void)
 	EE_Init(&gateway, sizeof(gateway));
 	EE_Read();
 	print_config();
+
+	HAL_Delay(2000);
 	//initialize the nrf24 in receive mode
 	while(HAL_GPIO_ReadPin(STM_EN_PIN_GPIO_Port, STM_EN_PIN_Pin) == 0)
 	{

@@ -74,6 +74,7 @@ typedef struct
 	char name[6];
 	uint8_t device_type;
 	uint8_t EUI[8];
+	uint8_t applicationId;
 	L01_config_t nrf24_config;
 	nRF24_transmit_data_t tx_packet;
 	thermostat_attr_t thermostatAttr;
